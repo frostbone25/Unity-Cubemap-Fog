@@ -9,7 +9,8 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: SceneCubemapFog
   m_Shader: {fileID: 4800000, guid: 54eceac8c5670054b883ffe0676eb87d, type: 3}
-  m_ShaderKeywords: _FOG_CUBEMAP_USECONSTANTMIP_ON
+  m_ShaderKeywords: DO_HEIGHT_FOG OCCLUDE_SKY USE_CONSTANT_MIP UseConstantMip _FOG_CUBEMAP_USECONSTANTMIP_ON
+    _OCCLUDE_SKY
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -77,17 +78,18 @@ Material:
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _Fog_Cubemap_Exposure: 1
-    - _Fog_Cubemap_Mip_Distance: 1
+    - _Fog_Cubemap_Mip_Distance: 11.61
     - _Fog_Cubemap_Mip_MinLevel: 4.31
-    - _Fog_Cubemap_Mip_Multiplier: 1
+    - _Fog_Cubemap_Mip_Multiplier: 0.22
     - _Fog_Cubemap_UseConstantMip: 1
     - _Fog_Density: 0.09
+    - _Fog_DoHeightFog: 1
     - _Fog_Height: 2.24
     - _Fog_Height_Density: 0.05
     - _Fog_Height_Falloff: 0.14
     - _Fog_Height_StartDistance: -1.65
     - _Fog_OccludeSky: 1
-    - _Fog_StartDistance: 7.01
+    - _Fog_StartDistance: 2.94
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1

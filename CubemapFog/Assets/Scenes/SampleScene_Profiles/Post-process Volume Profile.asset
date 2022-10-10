@@ -26,20 +26,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3aba93752340b3945ba7b6571725359c, type: 3}
   m_Name: CubemapFog
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   enabled:
-    overrideState: 1
-    value: 1
-  intensity:
     overrideState: 1
     value: 1
   fogCubemap:
     overrideState: 1
     value: {fileID: 8900000, guid: cc98c81feaae9094b9de26229de2389d, type: 3}
     defaultState: 1
-  fogOccludeSky:
-    overrideState: 1
-    value: 1
   fogCubemapExposure:
     overrideState: 1
     value: 1
@@ -48,12 +42,18 @@ MonoBehaviour:
     value: 1
   fogCubemapMipLevel:
     overrideState: 1
-    value: 3.96
+    value: 5.09
   fogCubemapMipDistance:
-    overrideState: 0
-    value: 0
+    overrideState: 1
+    value: 33.34
   fogCubemapMipMultiplier:
-    overrideState: 0
+    overrideState: 1
+    value: 0.12
+  intensity:
+    overrideState: 1
+    value: 1
+  fogOccludeSky:
+    overrideState: 1
     value: 1
   fogStartDistance:
     overrideState: 1
@@ -61,12 +61,15 @@ MonoBehaviour:
   fogDensity:
     overrideState: 1
     value: 0.16
+  heightEnable:
+    overrideState: 1
+    value: 1
   heightFogStartDistance:
     overrideState: 1
     value: 0
   heightFogDensity:
     overrideState: 1
-    value: 0.07
+    value: 0.01
   heightFogHeight:
     overrideState: 1
     value: 14.56
@@ -74,9 +77,6 @@ MonoBehaviour:
     overrideState: 0
     value: 1
   viewFog:
-    overrideState: 0
-    value: 0
-  viewHeightFog:
     overrideState: 0
     value: 0
   viewMipDistance:

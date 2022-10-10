@@ -7,17 +7,18 @@
         _Fog_Cubemap_Exposure("Exposure", Float) = 1
 
         [Header(Mip Mapping)]
-        [Toggle] _Fog_Cubemap_UseConstantMip("Use Constant Mip", Float) = 1
+        [Toggle(USE_CONSTANT_MIP)] _Fog_Cubemap_UseConstantMip("Use Constant Mip", Float) = 1
         _Fog_Cubemap_Mip_MinLevel("Mip Level", Float) = 1
         _Fog_Cubemap_Mip_Distance("Mip Distance", Float) = 1
         _Fog_Cubemap_Mip_Multiplier("Mip Density Multiplier", Float) = 1
 
         [Header(Fog Main)]
-        [Toggle] _Fog_OccludeSky("Occlude Sky", Float) = 1
+        [Toggle(OCCLUDE_SKY)] _Fog_OccludeSky("Occlude Sky", Float) = 1
         _Fog_StartDistance("Start Distance", Float) = 1
         _Fog_Density("Density", Float) = 1
 
         [Header(Fog Height)]
+        [Toggle(DO_HEIGHT_FOG)] _Fog_DoHeightFog("Enable Height Fog", Float) = 1
         _Fog_Height_StartDistance("Height Distance", Float) = 1
         _Fog_Height_Density("Height Density", Float) = 1
         _Fog_Height("Height", Float) = 1
@@ -28,10 +29,7 @@
     {
         Tags { "RenderType" = "Transparent" "Queue" = "Transparent+2000" }
 
-        Cull Off
-        ZWrite Off
-        ZTest Off
-
+        Cull Off ZWrite Off ZTest Off
         Blend SrcAlpha OneMinusSrcAlpha
 
         Pass
@@ -40,6 +38,10 @@
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing  
+            #pragma shader_feature_local OCCLUDE_SKY
+            #pragma shader_feature_local USE_CONSTANT_MIP
+            #pragma shader_feature_local DO_HEIGHT_FOG
+            #pragma fragmentoption ARB_precision_hint_fastest
             #include "UnityCG.cginc"
 
             struct appdata
@@ -55,35 +57,32 @@
                 fixed4 vertex : SV_POSITION;
                 fixed4 screenPos : TEXCOORD0;
                 fixed3 camRelativeWorldPos : TEXCOORD1;
-                float2 depth : TEXCOORD2;
 
                 //Single Pass Instanced Support
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
+            //cubemap properties
             samplerCUBE _Fog_Cubemap;
+            fixed _Fog_Cubemap_Exposure;
 
-            float _Fog_Cubemap_UseConstantMip;
-            float _Fog_Cubemap_Mip_MinLevel;
-            float _Fog_Cubemap_Mip_Distance;
-            float _Fog_Cubemap_Mip_Multiplier;
-            float _Fog_Cubemap_Exposure;
+            //mip mapping properties
+            fixed _Fog_Cubemap_Mip_MinLevel;
+            fixed _Fog_Cubemap_Mip_Distance;
+            fixed _Fog_Cubemap_Mip_Multiplier;
 
-            float _Fog_StartDistance;
-            float _Fog_Density;
+            //fog properties
+            fixed _Fog_StartDistance;
+            fixed _Fog_Density;
 
-            float _Fog_Height_StartDistance;
-            float _Fog_Height_Density;
-            float _Fog_Height;
-            float _Fog_Height_Falloff;
-            float _Fog_OccludeSky;
+            //height fog properties
+            fixed _Fog_Height_StartDistance;
+            fixed _Fog_Height_Density;
+            fixed _Fog_Height;
+            fixed _Fog_Height_Falloff;
 
-            //other shader values
-            float2 CamValues; //x = farplane, y = nearplane
-            float4 DebugModes; //x = classic fog, y = height fog, z = mip distance, w = cubemap only
-
-            UNITY_DECLARE_SCREENSPACE_TEXTURE(_CameraDepthTexture);
             //sampler2D_float _CameraDepthTexture;
+            UNITY_DECLARE_SCREENSPACE_TEXTURE(_CameraDepthTexture);
             fixed4 _CameraDepthTexture_TexelSize;
 
             v2f vert(appdata v)
@@ -96,22 +95,27 @@
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
                 o.vertex = UnityObjectToClipPos(v.vertex);
-
                 o.screenPos = UnityStereoTransformScreenSpaceTex(ComputeScreenPos(o.vertex));
-
                 o.camRelativeWorldPos = mul(unity_ObjectToWorld, fixed4(v.vertex.xyz, 1.0)).xyz - _WorldSpaceCameraPos;
+
+#if UNITY_UV_STARTS_AT_TOP
+                if (_CameraDepthTexture_TexelSize.y < 0)
+                    o.screenPos.y = 1 - o.screenPos.y;
+#endif
+
+#if UNITY_SINGLE_PASS_STEREO
+                // If Single-Pass Stereo mode is active, transform the
+                // coordinates to get the correct output UV for the current eye.
+                fixed4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
+                o.screenPos = (o.screenPos - scaleOffset.zw) / scaleOffset.xy;
+#endif
 
                 return o;
             }
 
-            float ComputeDistance(float3 ray, float depth)
+            fixed ComputeDistance(fixed3 ray, fixed depth)
             {
-                float dist;
-
-                dist = length(ray * depth);
-                dist -= _ProjectionParams.y;
-
-                return dist;
+                return length(ray * depth) - _ProjectionParams.y;
             }
 
             fixed4 frag(v2f i) : SV_Target
@@ -122,68 +126,50 @@
                 //get our screen uv coords
                 fixed2 screenUV = i.screenPos.xy / i.screenPos.w;
 
-
-#if UNITY_UV_STARTS_AT_TOP
-                if (_CameraDepthTexture_TexelSize.y < 0) 
-                    screenUV.y = 1 - screenUV.y;
-#endif
-
-#if UNITY_SINGLE_PASS_STEREO
-                // If Single-Pass Stereo mode is active, transform the
-                // coordinates to get the correct output UV for the current eye.
-                float4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
-                screenUV = (screenUV - scaleOffset.zw) / scaleOffset.xy;
-#endif
-
+                //draw our scene depth texture
                 fixed depth = SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.screenPos));
-
-                //draw our scene depth texture and linearize it
-                fixed linearDepth = LinearEyeDepth(depth);
+                fixed linearDepth = LinearEyeDepth(depth); //linearize it
+                fixed linear01depth = Linear01Depth(depth * (depth < 1.0));
 
                 //calculate the world position view plane for the camera
                 fixed3 cameraWorldPositionViewPlane = i.camRelativeWorldPos.xyz / dot(i.camRelativeWorldPos.xyz, unity_WorldToCamera._m20_m21_m22);
 
                 //get the world position vector
                 fixed3 worldPos = cameraWorldPositionViewPlane * linearDepth + _WorldSpaceCameraPos;
+                fixed3 cameraWorldDir = _WorldSpaceCameraPos.xyz - worldPos.xyz;
 
-                float3 cameraWorldDir = _WorldSpaceCameraPos.xyz - worldPos.xyz;
-                float linear01depth = Linear01Depth(depth * (depth < 1.0));
-                float computedDistance = ComputeDistance(cameraWorldDir.rgb, linear01depth);
+                //compute a radial distance (instead of just modifying the regular scene depth buffer for fog since if the camera rotates )
+                fixed computedDistance = ComputeDistance(cameraWorldDir.rgb, linear01depth);
 
-                float fog = max(0.0f, (computedDistance - _Fog_StartDistance) * _Fog_Density);
-                float fog_height = max(0.0f, (computedDistance - _Fog_Height_StartDistance) * _Fog_Height_Density);
+                //calculate the main fog
+                fixed fog = max(0.0f, (computedDistance - _Fog_StartDistance) * _Fog_Density);
+                fog = saturate(fog); //clamp it
+
+#ifdef DO_HEIGHT_FOG
+                fixed fog_height = max(0.0f, (computedDistance - _Fog_Height_StartDistance) * _Fog_Height_Density);
                 fog_height = lerp(fog_height, 0.0f, (worldPos.y * _Fog_Height_Falloff) - _Fog_Height);
-
-                fog = saturate(fog);
                 fog_height = saturate(fog_height);
+                fog = saturate(fog + fog_height);
+#endif
 
-                if (depth == 1.0f && _Fog_OccludeSky < 1)
-                {
+#ifdef OCCLUDE_SKY
+#else
+                if (linearDepth > _ProjectionParams.z - 0.001) //if we don't want to occlude the sky, make sure that at the highest depth value (farthest from camera) we don't do any fog.
                     fog = 0.0f;
-                    fog_height = 0.0f;
-                }
+#endif
 
-                float4 cubemap = float4(0, 0, 0, 0);
-                float mipDistance = 0.0f;
-
-                if (_Fog_Cubemap_UseConstantMip > 0) //use a constant mip level?
-                {
-                    cubemap = texCUBElod(_Fog_Cubemap, float4(-cameraWorldDir.xyz, _Fog_Cubemap_Mip_MinLevel)) * _Fog_Cubemap_Exposure;
-                }
-                else //using a fog based mip plevel
-                {
-                    mipDistance = 1 - max(0.0f, (computedDistance - _Fog_Cubemap_Mip_Distance) * _Fog_Cubemap_Mip_Multiplier);
-                    mipDistance = saturate(mipDistance) * _Fog_Cubemap_Mip_MinLevel;
-
-                    cubemap = texCUBElod(_Fog_Cubemap, float4(-cameraWorldDir.xyz, mipDistance)) * _Fog_Cubemap_Exposure;
-                }
-
-                float4 result = float4(cubemap.rgb, saturate(fog + fog_height));
-                //result.rgb = lerp(color.rgb, cubemap.rgb, fog);
-                //result.rgb = lerp(color.rgb, cubemap.rgb, fog_height);
+#ifdef USE_CONSTANT_MIP
+                //use a constant mip level
+                fixed mipDistance = _Fog_Cubemap_Mip_MinLevel;
+#else 
+                //using a fog based mip plevel
+                fixed mipDistance = 1 - max(0.0f, (computedDistance - _Fog_Cubemap_Mip_Distance) * _Fog_Cubemap_Mip_Multiplier);
+                mipDistance = saturate(mipDistance) * _Fog_Cubemap_Mip_MinLevel;
+#endif
+                fixed4 cubemap = texCUBElod(_Fog_Cubemap, fixed4(-cameraWorldDir.xyz, mipDistance)) * _Fog_Cubemap_Exposure;
 
                 //return the final fog color
-                return result;
+                return fixed4(cubemap.rgb, fog);
             }
             ENDCG
         }
